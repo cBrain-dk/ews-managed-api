@@ -52,6 +52,9 @@ namespace Microsoft.Exchange.WebServices.Autodiscover
         {
             WebClientUrlCollection instance = new WebClientUrlCollection();
 
+            if (reader.IsEmptyElement)
+                return instance;
+
             do
             {
                 reader.Read();
