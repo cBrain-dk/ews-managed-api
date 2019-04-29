@@ -841,7 +841,7 @@ namespace Microsoft.Exchange.WebServices.Autodiscover
 
             for (int currentHop = 0; currentHop < AutodiscoverService.AutodiscoverMaxRedirections; currentHop++)
             {
-                GetUserSettingsResponse response = this.GetUserSettings(smtpAddresses, requestedSettings)[0];
+                GetUserSettingsResponse response = this.GetUserSettings(smtpAddresses, requestedSettings, true)[0];
 
                 switch (response.ErrorCode)
                 {
@@ -882,19 +882,26 @@ namespace Microsoft.Exchange.WebServices.Autodiscover
         /// </summary>
         /// <param name="smtpAddresses">The SMTP addresses of the users.</param>
         /// <param name="settings">The settings.</param>
+        /// <param name="followRedirects">Whether redirects are automatically handled.</param>
         /// <returns></returns>
         internal GetUserSettingsResponseCollection GetUserSettings(
             List<string> smtpAddresses,
-            List<UserSettingName> settings)
+            List<UserSettingName> settings,
+            bool followRedirects)
         {
             EwsUtilities.ValidateParam(smtpAddresses, "smtpAddresses");
             EwsUtilities.ValidateParam(settings, "settings");
 
-            return this.GetSettings<GetUserSettingsResponseCollection, UserSettingName>(
+            GetSettingsMethod<GetUserSettingsResponseCollection, UserSettingName> getSettings;
+            if (followRedirects)
+              getSettings = InternalGetUserSettings;
+            else
+              getSettings = InternalGetUserSettingsNoRedirect;
+            return GetSettings(
                 smtpAddresses,
                 settings,
                 null,
-                this.InternalGetUserSettings,
+                getSettings,
                 delegate() { return EwsUtilities.DomainFromEmailAddress(smtpAddresses[0]); });
         }
 
@@ -1064,10 +1071,39 @@ namespace Microsoft.Exchange.WebServices.Autodiscover
         /// <param name="requestedVersion">Requested version of the Exchange service.</param>
         /// <param name="autodiscoverUrl">The autodiscover URL.</param>
         /// <returns>GetUserSettingsResponse collection.</returns>
+        /// <summary>
         private GetUserSettingsResponseCollection InternalGetUserSettings(
             List<string> smtpAddresses,
             List<UserSettingName> settings,
             ExchangeVersion? requestedVersion,
+            ref Uri autodiscoverUrl)
+        {
+            return InternalGetUserSettings(smtpAddresses, settings, requestedVersion, true, ref autodiscoverUrl);
+        }
+
+        /// <summary>
+        /// Gets settings for one or more users without automatic handling of redirects.
+        /// </summary>
+        /// <param name="smtpAddresses">The SMTP addresses of the users.</param>
+        /// <param name="settings">The settings.</param>
+        /// <param name="requestedVersion">Requested version of the Exchange service.</param>
+        /// <param name="autodiscoverUrl">The autodiscover URL.</param>
+        /// <returns>GetUserSettingsResponse collection.</returns>
+        /// <summary>
+        private GetUserSettingsResponseCollection InternalGetUserSettingsNoRedirect(
+            List<string> smtpAddresses,
+            List<UserSettingName> settings,
+            ExchangeVersion? requestedVersion,
+            ref Uri autodiscoverUrl)
+        {
+          return InternalGetUserSettings(smtpAddresses, settings, requestedVersion, false, ref autodiscoverUrl);
+        }
+
+    private GetUserSettingsResponseCollection InternalGetUserSettings(
+            List<string> smtpAddresses,
+            List<UserSettingName> settings,
+            ExchangeVersion? requestedVersion,
+            bool followRedirects,
             ref Uri autodiscoverUrl)
         {
             // The response to GetUserSettings can be a redirection. Execute GetUserSettings until we get back 
@@ -1080,7 +1116,7 @@ namespace Microsoft.Exchange.WebServices.Autodiscover
                 GetUserSettingsResponseCollection response = request.Execute();
 
                 // Did we get redirected?
-                if (response.ErrorCode == AutodiscoverErrorCode.RedirectUrl && response.RedirectionUrl != null)
+                if (followRedirects && response.ErrorCode == AutodiscoverErrorCode.RedirectUrl && response.RedirectionUrl != null)
                 {
                     this.TraceMessage(
                         TraceFlags.AutodiscoverConfiguration,
@@ -1702,7 +1738,30 @@ namespace Microsoft.Exchange.WebServices.Autodiscover
             List<string> smtpAddresses = new List<string>(userSmtpAddresses);
             List<UserSettingName> settings = new List<UserSettingName>(userSettingNames);
 
-            return this.GetUserSettings(smtpAddresses, settings);
+            return this.GetUserSettings(smtpAddresses, settings, true);
+        }
+
+
+        /// <summary>
+        /// Retrieves the specified settings for a set of users without automatically following redirects.
+        /// </summary>
+        /// <param name="userSmtpAddresses">The SMTP addresses of the users.</param>
+        /// <param name="userSettingNames">The user setting names.</param>
+        /// <returns>A GetUserSettingsResponseCollection object containing the responses for each individual user.</returns>
+        public GetUserSettingsResponseCollection GetUsersSettingsNoRedirect(
+            IEnumerable<string> userSmtpAddresses,
+            params UserSettingName[] userSettingNames)
+        {
+            if (this.RequestedServerVersion < MinimumRequestVersionForAutoDiscoverSoapService)
+            {
+                throw new ServiceVersionException(
+                    string.Format(Strings.AutodiscoverServiceIncompatibleWithRequestVersion, MinimumRequestVersionForAutoDiscoverSoapService));
+            }
+
+            List<string> smtpAddresses = new List<string>(userSmtpAddresses);
+            List<UserSettingName> settings = new List<UserSettingName>(userSettingNames);
+
+            return this.GetUserSettings(smtpAddresses, settings, false);
         }
 
         /// <summary>
