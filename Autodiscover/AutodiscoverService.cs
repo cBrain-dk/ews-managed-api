@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Exchange Web Services Managed API
  *
  * Copyright (c) Microsoft Corporation
@@ -72,21 +72,6 @@ namespace Microsoft.Exchange.WebServices.Autodiscover
         /// Autodiscover SOAP HTTPS Url
         /// </summary>
         private const string AutodiscoverSoapHttpsUrl = "https://{0}/autodiscover/autodiscover.svc";
-
-        /// <summary>
-        /// Autodiscover SOAP WS-Security HTTPS Url
-        /// </summary>
-        private const string AutodiscoverSoapWsSecurityHttpsUrl = AutodiscoverSoapHttpsUrl + "/wssecurity";
-
-        /// <summary>
-        /// Autodiscover SOAP WS-Security symmetrickey HTTPS Url
-        /// </summary>
-        private const string AutodiscoverSoapWsSecuritySymmetricKeyHttpsUrl = AutodiscoverSoapHttpsUrl + "/wssecurity/symmetrickey";
-
-        /// <summary>
-        /// Autodiscover SOAP WS-Security x509cert HTTPS Url
-        /// </summary>
-        private const string AutodiscoverSoapWsSecurityX509CertHttpsUrl = AutodiscoverSoapHttpsUrl + "/wssecurity/x509cert";
 
         /// <summary>
         /// Autodiscover request namespace
@@ -1239,11 +1224,11 @@ namespace Microsoft.Exchange.WebServices.Autodiscover
                 url = new Uri(string.Format(AutodiscoverSoapHttpsUrl, host));
 
                 // Make sure that at least one of the non-legacy endpoints is available.
-                if (((endpoints & AutodiscoverEndpoints.Soap) != AutodiscoverEndpoints.Soap) &&
-                    ((endpoints & AutodiscoverEndpoints.WsSecurity) != AutodiscoverEndpoints.WsSecurity) &&
-                    ((endpoints & AutodiscoverEndpoints.WSSecuritySymmetricKey) != AutodiscoverEndpoints.WSSecuritySymmetricKey) &&
-                    ((endpoints & AutodiscoverEndpoints.WSSecurityX509Cert) != AutodiscoverEndpoints.WSSecurityX509Cert) &&
-                    ((endpoints & AutodiscoverEndpoints.OAuth) != AutodiscoverEndpoints.OAuth))
+                if (!endpoints.HasFlag(AutodiscoverEndpoints.Soap) &&
+                    !endpoints.HasFlag(AutodiscoverEndpoints.WsSecurity) &&
+                    !endpoints.HasFlag(AutodiscoverEndpoints.WSSecuritySymmetricKey) &&
+                    !endpoints.HasFlag(AutodiscoverEndpoints.WSSecurityX509Cert) &&
+                    !endpoints.HasFlag(AutodiscoverEndpoints.OAuth))
                 {
                     this.TraceMessage(
                         TraceFlags.AutodiscoverConfiguration,
@@ -1253,57 +1238,35 @@ namespace Microsoft.Exchange.WebServices.Autodiscover
                 }
 
                 // If we have WLID credentials, make sure that we have a WS-Security endpoint
-                if (this.Credentials is WindowsLiveCredentials)
+                if ((this.Credentials is WindowsLiveCredentials) && (endpoints & AutodiscoverEndpoints.WsSecurity) != AutodiscoverEndpoints.WsSecurity)
                 {
-                    if ((endpoints & AutodiscoverEndpoints.WsSecurity) != AutodiscoverEndpoints.WsSecurity)
-                    {
-                        this.TraceMessage(
-                            TraceFlags.AutodiscoverConfiguration,
-                            string.Format("No Autodiscover WS-Security endpoint is available for host {0}", host));
+                    this.TraceMessage(
+                        TraceFlags.AutodiscoverConfiguration,
+                        string.Format("No Autodiscover WS-Security endpoint is available for host {0}", host));
 
-                        return false;
-                    }
-                    else
-                    {
-                        url = new Uri(string.Format(AutodiscoverSoapWsSecurityHttpsUrl, host));
-                    }
+                    return false;
                 }
-                else if (this.Credentials is PartnerTokenCredentials)
+                else if ((this.Credentials is PartnerTokenCredentials) && (endpoints & AutodiscoverEndpoints.WSSecuritySymmetricKey) != AutodiscoverEndpoints.WSSecuritySymmetricKey)
                 {
-                    if ((endpoints & AutodiscoverEndpoints.WSSecuritySymmetricKey) != AutodiscoverEndpoints.WSSecuritySymmetricKey)
-                    {
-                        this.TraceMessage(
-                            TraceFlags.AutodiscoverConfiguration,
-                            string.Format("No Autodiscover WS-Security/SymmetricKey endpoint is available for host {0}", host));
+                    this.TraceMessage(
+                        TraceFlags.AutodiscoverConfiguration,
+                        string.Format("No Autodiscover WS-Security/SymmetricKey endpoint is available for host {0}", host));
 
-                        return false;
-                    }
-                    else
-                    {
-                        url = new Uri(string.Format(AutodiscoverSoapWsSecuritySymmetricKeyHttpsUrl, host));
-                    }
+                    return false;
                 }
-                else if (this.Credentials is X509CertificateCredentials)
+                else if ((this.Credentials is X509CertificateCredentials) && (endpoints & AutodiscoverEndpoints.WSSecurityX509Cert) != AutodiscoverEndpoints.WSSecurityX509Cert)
                 {
-                    if ((endpoints & AutodiscoverEndpoints.WSSecurityX509Cert) != AutodiscoverEndpoints.WSSecurityX509Cert)
-                    {
-                        this.TraceMessage(
-                            TraceFlags.AutodiscoverConfiguration,
-                            string.Format("No Autodiscover WS-Security/X509Cert endpoint is available for host {0}", host));
+                    this.TraceMessage(
+                        TraceFlags.AutodiscoverConfiguration,
+                        string.Format("No Autodiscover WS-Security/X509Cert endpoint is available for host {0}", host));
 
-                        return false;
-                    }
-                    else
-                    {
-                        url = new Uri(string.Format(AutodiscoverSoapWsSecurityX509CertHttpsUrl, host));
-                    }
+                    return false;
                 }
-                else if (this.Credentials is OAuthCredentials)
-                {
-                    // If the credential is OAuthCredentials, no matter whether we have
-                    // the corresponding x-header, we will go with OAuth. 
-                    url = new Uri(string.Format(AutodiscoverSoapHttpsUrl, host));
-                }
+                // If the credential is OAuthCredentials, no matter whether we have
+                // the corresponding x-header, we will go with OAuth. 
+
+                if (Credentials != null)
+                    url = Credentials.AdjustUrl(url);
 
                 return true;
             }
