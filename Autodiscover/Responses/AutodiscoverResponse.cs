@@ -90,7 +90,7 @@ namespace Microsoft.Exchange.WebServices.Autodiscover
         /// Gets or sets the redirection URL.
         /// </summary>
         /// <value>The redirection URL.</value>
-        internal Uri RedirectionUrl
+        public Uri RedirectionUrl
         {
             get { return this.redirectionUrl; }
             set { this.redirectionUrl = value; }
