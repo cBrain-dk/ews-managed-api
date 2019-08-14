@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Exchange Web Services Managed API
  *
  * Copyright (c) Microsoft Corporation
@@ -698,6 +698,18 @@ namespace Microsoft.Exchange.WebServices.Data
                 this.useDefaultCredentials = false;
                 this.cookieContainer = new CookieContainer();       // Changing credentials resets the Cookie container
             }
+        }
+
+        /// <summary>
+        /// Set Credentials without clearing the Cookie container. This can be used to thread-safely update 
+        /// OAuth2 Credentials after refreshing them but may lead to unexpected results if the credentials
+        /// don't represent the same identity.
+        /// </summary>
+        /// <param name="credentials"></param>
+        public void SetCredentialsNoResetCookieContainer(ExchangeCredentials credentials)
+        {
+            this.credentials = credentials;
+            this.useDefaultCredentials = false;
         }
 
         /// <summary>
